@@ -11,6 +11,7 @@
         <FIELD NAME="sourcedidsource" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false" COMMENT="Default comment for the field, please edit me"/>
         <FIELD NAME="coursenumber" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The course number (crn) for the course"/>
         <FIELD NAME="term" TYPE="char" LENGTH="128" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Banner term code for the course"/>
+        <FIELD NAME="coursesourcedid" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="longtitle" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Default comment for the field, please edit me"/>
         <FIELD NAME="fulltitle" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Course title as reported by Banner/LMB"/>
         <FIELD NAME="rubric" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The rubric for the course"/>
@@ -148,6 +149,7 @@
         <FIELD NAME="dept" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="categoryid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="cattype" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="collegesourcedid" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -156,6 +158,33 @@
         <INDEX NAME="enrolmbcate_ter_ix" UNIQUE="false" FIELDS="termsourcedid"/>
         <INDEX NAME="enrolmbcate_dep_ix" UNIQUE="false" FIELDS="dept"/>
       </INDEXES>
+    </TABLE>    
+    <TABLE NAME="enrol_lmb_colleges" COMMENT="Colleges as reported by LMB/Banner">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sourcedid" TYPE="char" LENGTH="128" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="sourcedidsource" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="shortdescription" TYPE="text" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="longdescription" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+    </TABLE>
+    <TABLE NAME="enrol_lmb_coursebase" COMMENT="Course base records as reported by LMB/Banner">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sourcedid" TYPE="char" LENGTH="128" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="sourcedidsource" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="shortdescription" TYPE="text" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="longdescription" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="collegesourcedid" TYPE="char" LENGTH="128" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
     </TABLE>
   </TABLES>
 </XMLDB>

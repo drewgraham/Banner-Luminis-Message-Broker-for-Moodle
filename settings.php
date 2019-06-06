@@ -197,6 +197,8 @@ if ($ADMIN->fulltree) {
     $options['term'] = get_string('termcat', 'enrol_lmb');
     $options['dept'] = get_string('deptcat', 'enrol_lmb');
     $options['deptcode'] = get_string('deptcodecat', 'enrol_lmb');
+    $options['collegedept'] = get_string('collegedeptcat', 'enrol_lmb');
+    $options['collegedeptcode'] = get_string('collegedeptcodecat', 'enrol_lmb');
     $options['termdept'] = get_string('termdeptcat', 'enrol_lmb');
     $options['termdeptcode'] = get_string('termdeptcodecat', 'enrol_lmb');
     $options['other'] = get_string('selectedcat', 'enrol_lmb');

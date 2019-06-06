@@ -910,5 +910,81 @@ function xmldb_enrol_lmb_upgrade($oldversion=0) {
         upgrade_plugin_savepoint(true, 2016020901, 'enrol', 'lmb');
     }
 
+    if ($oldversion < 2019060501) {
+
+        // Define table enrol_lmb_colleges to be created.
+        $table = new xmldb_table('enrol_lmb_colleges');
+
+        // Adding fields to table enrol_lmb_colleges.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('sourcedid', XMLDB_TYPE_CHAR, '128', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('sourcedidsource', XMLDB_TYPE_CHAR, '128', null, null, null, null);
+        $table->add_field('shortdescription', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('longdescription', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+
+        // Adding keys to table enrol_lmb_colleges.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        // Conditionally launch create table for enrol_lmb_colleges.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Define field collegesourcedid to be added to enrol_lmb_categories.
+        $table = new xmldb_table('enrol_lmb_categories');
+        $field = new xmldb_field('collegesourcedid', XMLDB_TYPE_CHAR, '128', null, null, null, null, 'cattype');
+
+        // Conditionally launch add field collegesourcedid.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Define field collegesourcedid to be added to enrol_lmb_courses.
+        $table = new xmldb_table('enrol_lmb_courses');
+        $field = new xmldb_field('collegesourcedid', XMLDB_TYPE_CHAR, '128', null, null, null, null, 'term');
+
+        // Conditionally launch add field collegesourcedid.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        // Lmb savepoint reached.
+        upgrade_plugin_savepoint(true, 2019060501, 'enrol', 'lmb');
+    }
+
+    if ($oldversion < 2019060601) {
+
+        // Rename field collegesourcedid on table enrol_lmb_courses to coursesourceid.
+        $table = new xmldb_table('enrol_lmb_courses');
+        $field = new xmldb_field('collegesourcedid', XMLDB_TYPE_CHAR, '128', null, null, null, null, 'term');
+
+        // Launch rename field coursesourcedid.
+        $dbman->rename_field($table, $field, 'coursesourceid');
+
+        // Define table enrol_lmb_colleges to be created.
+        $table = new xmldb_table('enrol_lmb_coursebase');
+
+        // Adding fields to table enrol_lmb_colleges.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('sourcedid', XMLDB_TYPE_CHAR, '128', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('sourcedidsource', XMLDB_TYPE_CHAR, '128', null, null, null, null);
+        $table->add_field('shortdescription', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('longdescription', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('collegesourcedid', XMLDB_TYPE_CHAR, '128', null, null, null, null);
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+
+        // Adding keys to table enrol_lmb_colleges.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        // Conditionally launch create table for enrol_lmb_colleges.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Lmb savepoint reached.
+        upgrade_plugin_savepoint(true, 2019060601, 'enrol', 'lmb');
+    }
+
     return $result;
 }

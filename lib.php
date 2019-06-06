@@ -436,8 +436,16 @@ class enrol_lmb_plugin extends enrol_plugin {
         if (preg_match('{<group>.*?<grouptype>.*?<typevalue.*?\>(.+?)</typevalue>.*?</grouptype>.*?</group>}is',
                 $tagcontents, $matches)) {
             switch (trim($matches[1])) {
+                case 'College':
+                    return $this->process_college_tag($tagcontents);
+                    break;
+                
                 case 'Term':
                     return $this->process_term_tag($tagcontents);
+                    break;
+
+                case 'Course':
+                    return $this->process_course_tag($tagcontents);
                     break;
 
                 case 'CourseSection':
@@ -537,9 +545,18 @@ class enrol_lmb_plugin extends enrol_plugin {
             $logline .= 'org/orgunit not defined:';
         }
 
+        // Get the course id
+        
+        if (preg_match('{<relationship relation="[0-9]+">.*<sourcedid>.*<source>.*<id>(.*)</id>.*</sourcedid>.*<label>Course</label>.*</relationship>}is', $tagcontents, $matches)) {
+            $course->coursesourcedid = trim($matches[1]);
+        } else {
+            $course->coursesourcedid = '';
+            $logline .= 'course relationship not defined:';
+        }
+        
         $cat = new stdClass();
 
-        $cat->id = $this->get_category_id($course->term, $course->depttitle, $course->dept, $logline, $status);
+        $cat->id = $this->get_category_id($course->term, $course->depttitle, $course->dept, $course->coursesourcedid, $logline, $status);
 
         // Do the LMB tables check/update!
 
@@ -804,7 +821,84 @@ class enrol_lmb_plugin extends enrol_plugin {
         return false;
     }// TODO - make option?
 
+    private function get_lmb_coursebase($sourcedid) {
+        global $DB;
+        return $DB->get_record('enrol_lmb_coursebase', array('sourcedid' => $sourcedid));
+    }
 
+    private function get_lmb_college($sourcedid) {
+        global $DB;
+        return $DB->get_record('enrol_lmb_colleges', array('sourcedid' => $sourcedid));
+    }
+
+    private function get_lmb_college_category($collegesourcedid) {
+        global $DB;
+        return $DB->get_record('enrol_lmb_categories', array('collegesourcedid' => $collegesourcedid, 'cattype' => 'college'));
+    }
+
+    private function category_exists($categoryid) {
+        global $DB;
+        return $DB->record_exists('course_categories', array('id' => $categoryid));
+    }
+
+    private function delete_lmb_college_category($id) {
+        global $DB;
+        return $DB->delete_records('enrol_lmb_categories', array('collegesourcedid' => $id, 'cattype' => 'college'));
+    }
+    
+    private function create_college_category($lmbcollege, &$logline, &$status) {
+        global $DB;
+        
+        $collegecat = new stdClass();
+        $collegecat->id = '';
+
+        $collegecat->name = $lmbcollege->shortdescription;
+        
+        if ($this->get_config('cathidden')) {
+            $collegecat->visible = 0;
+        } else {
+            $collegecat->visible = 1;
+        }
+
+        $collegecat->sortorder = 999;
+
+        $collegecat->parent = $this->get_root_categoryid($logline, $status);
+
+        if ($collegecat->id = $DB->insert_record('course_categories', $collegecat, true)) {
+            $lmbcollegecat = new stdClass();
+            $lmbcollegecat->categoryid = $collegecat->id;
+            $lmbcollegecat->cattype = 'college';
+            $lmbcollegecat->collegesourcedid = $lmbcollege->sourcedid;
+
+            $collegecat->context = context_coursecat::instance($collegecat->id);
+            $collegecat->context->mark_dirty();
+            fix_course_sortorder();
+            if (!$DB->insert_record('enrol_lmb_categories', $lmbcollegecat)) {
+                $logline .= "error saving category to enrol_lmb_categories:";
+            }
+            $logline .= 'Created new (hidden) category:';
+        } else {
+            $logline .= 'error creating category:';
+            $status = false;
+            return $false;
+        }
+        
+        return $collegecat->id;
+    }
+
+    private function get_root_categoryid(&$logline, &$status) {
+        $category = '';
+        if ($this->get_config('catnested') && ($this->get_config('cattype') != 'other')) {
+            if ($this->get_config('catselect') > 0) {
+                //TODO $cat->parent = $this->get_config('catselect');
+                $category = $this->get_config('catselect');
+            } else {
+                $logline .= "category not selected:";
+                $status = false;
+            }
+        }
+        return $category;
+    }
 
     /**
      * Get the moodle id of a desired category based on settings. Create it if
@@ -813,17 +907,56 @@ class enrol_lmb_plugin extends enrol_plugin {
      * @param string $term the xml/ims idnumber for the term
      * @param string $depttitle the title of the department the course is in
      * @param string $deptcode the code of the department
+     * @param string $collegesourcedid the sourcedid of the college
      * @param string $logline a passed logline variable to append to
      * @param bool $status a passed states variable
      * @return int|bool the moodle id number of the category or false if there was an error
      */
-    public function get_category_id($term, $depttitle, $deptcode, &$logline, &$status) {
+    public function get_category_id($term, $depttitle, $deptcode, $coursesourcedid, &$logline, &$status) {
         global $DB;
 
         $cat = new stdClass();
 
-        if (($this->get_config('cattype') == 'deptcode') || ($this->get_config('cattype') == 'termdeptcode')) {
+        $cattype = $this->get_config('cattype');
+
+        if (($cattype == 'deptcode') || ($cattype == 'termdeptcode') || ($cattype = 'collegedeptcode')) {
             $depttitle = $deptcode;
+        }
+        
+        // Get/create college category if categorytype starts with college
+        if (substr($cattype, 0, 7) == 'college' && $coursesourcedid) {
+
+            if (!($lmbcoursebase = $this->get_lmb_coursebase($coursesourcedid))) {
+                $logline .= 'course not in enrol_lmb_coursebase:';
+                $status = false;
+                return false;
+            }
+
+            if ($lmbcoursebase->collegesourcedid && (!isset($this->catcache['college'][$lmbcoursebase->collegesourcedid]))) {
+
+                if (!($lmbcollege = $this->get_lmb_college($lmbcoursebase->collegesourcedid))) {
+                    $logline .= 'college not in enrol_lmb_colleges:';
+                    $status = false;
+                    return false;
+                }
+
+                if (($lmbcollegecat = $this->get_lmb_college_category($lmbcoursebase->collegesourcedid)) && $this->category_exists($lmbcollegecat->categoryid)) {
+                    $this->catcache['college'][$lmbcoursebase->collegesourcedid] = $lmbcollegecat->categoryid;
+                } else {
+                    if ($lmbcollegecat) {
+                        $this->delete_lmb_college_category($lmbcollegecat->id);
+                    }
+
+                    $this->catcache['college'][$lmbcoursebase->collegesourcedid] = $this->create_college_category($lmbcollege, $logline, $status);
+
+                    if (!$status) {
+                        return false;
+                    }
+                }
+            }
+            $collegesourcedid = $lmbcoursebase->collegesourcedid;
+        } else {
+            $collegesourcedid = null;
         }
 
         switch ($this->get_config('cattype')) {
@@ -831,7 +964,9 @@ class enrol_lmb_plugin extends enrol_plugin {
                 $cat->id = $this->get_term_category_id($term, $logline, $status);
 
                 break;
-
+        
+            case 'collegedeptcode':
+            case 'collegedept':
             case 'deptcode':
             case 'dept':
                 if (isset($this->catcache['dept'][$depttitle])) {
@@ -854,16 +989,8 @@ class enrol_lmb_plugin extends enrol_plugin {
                 }
                 $cat->sortorder = 999;
 
-                if ($this->get_config('catnested')) {
-                    if ($this->get_config('catselect') > 0) {
-                        $cat->parent = $this->get_config('catselect');
-                    } else {
-                        $logline .= "category not selected:";
-                        $status = false;
-
-                        break; 
-                    }
-                }
+                //parent order: 1. college. 2. get_root_categoryid.
+                $cat->parent = $collegesourcedid ? $this->catcache['college'][$collegesourcedid] : $this->get_root_categoryid($logline, $status);
 
                 if ($cat->id = $DB->insert_record('course_categories', $cat, true)) {
                     $lmbcat = new stdClass();
@@ -992,15 +1119,10 @@ class enrol_lmb_plugin extends enrol_plugin {
                 $cat->visible = 1;
             }
 
-            if ($this->get_config('catnested')) {
-                if ($this->get_config('catselect') > 0) {
-                    $cat->parent = $this->get_config('catselect');
-                } else {
-                    $logline .= "category not selected:";
-                    $status = false;
+            $cat->parent = $this->get_root_categoryid($logline, $status);
 
-                    return false; 
-                }
+            if (!$status) {
+                return false;
             }
 
             $cat->sortorder = 999;
@@ -1286,7 +1408,7 @@ class enrol_lmb_plugin extends enrol_plugin {
 
         $xlists = $newxlists;
 
-        $catid = $this->get_category_id($term, 'Crosslisted', 'XLS', $logline, $status);
+        $catid = $this->get_category_id($term, 'Crosslisted', 'XLS', null, $logline, $status);
 
         if ($type == 'meta') {
             $meta = true;
@@ -2316,6 +2438,163 @@ class enrol_lmb_plugin extends enrol_plugin {
 
     }
 
+
+     /**
+     * Processes a given college tag. Basically just inserting the info
+     * in a lmb internal table for future use.
+     *
+     * @param string $tagcontents The raw contents of the XML element
+     * @return bool success of failure of processing the tag
+     */
+    public function process_college_tag($tagcontents) {
+        global $DB;
+
+        $status = true;
+        $logline = 'College:';
+
+        $college = new stdClass();
+
+        // Sourcedid Source.
+        if (preg_match('{<sourcedid>.*?<source>(.+?)</source>.*?</sourcedid>}is', $tagcontents, $matches)) {
+            $college->sourcedidsource = trim($matches[1]);
+        }
+
+        if (preg_match('{<sourcedid>.*?<id>(.+?)</id>.*?</sourcedid>}is', $tagcontents, $matches)) {
+            $college->sourcedid = trim($matches[1]);
+            $logline .= $college->sourcedid.':';
+        } else {
+            $this->log_line($logline."sourcedid not found!");
+            return false;
+        }
+
+        if (preg_match('{<description>.*?<short>(.+?)</short>.*?</description>}is', $tagcontents, $matches)) {
+            $college->shortdescription = trim($matches[1]);
+        } else {
+            $logline .= "short description not found:";
+            $status = false;
+        }
+
+        if (preg_match('{<description>.*?<long>(.+?)</long>.*?</description>}is', $tagcontents, $matches)) {
+            $college->longdescription = trim($matches[1]);
+        } else {
+            $logline .= "long description not found:";
+            $status = false;
+        }
+
+        $college->timemodified = time();
+
+        if ($oldcollege = $DB->get_record('enrol_lmb_colleges', array('sourcedid' => $college->sourcedid))) {
+            $college->id = $oldcollege->id;
+
+            if ($id = $DB->update_record('enrol_lmb_colleges', $college)) {
+                $logline .= 'updated college:';
+            } else {
+                $logline .= 'failed to update college:';
+                $status = false;
+            }
+        } else {
+            if ($id = $DB->insert_record('enrol_lmb_colleges', $college, true)) {
+                $logline .= 'create college:';
+                $college->id = $id;
+            } else {
+                $logline .= 'create to update college:';
+                $status = false;
+            }
+        }
+
+        if ($status) {
+            if (!$this->get_config('logerrors')) {
+                $this->log_line($logline.'complete');
+            }
+        } else {
+            $this->log_line($logline.'error');
+        }
+
+        return $status;
+    }
+
+
+     /**
+     * Processes a given course tag (not coursesection). Basically just inserting the info
+     * in a lmb internal table for future use.
+     *
+     * @param string $tagcontents The raw contents of the XML element
+     * @return bool success of failure of processing the tag
+     */
+    public function process_course_tag($tagcontents) {
+        global $DB;
+
+        $status = true;
+        $logline = 'Course base:';
+
+        $course = new stdClass();
+
+        // Sourcedid Source.
+        if (preg_match('{<sourcedid>.*?<source>(.+?)</source>.*?</sourcedid>}is', $tagcontents, $matches)) {
+            $course->sourcedidsource = trim($matches[1]);
+        }
+
+        if (preg_match('{<sourcedid>.*?<id>(.+?)</id>.*?</sourcedid>}is', $tagcontents, $matches)) {
+            $course->sourcedid = trim($matches[1]);
+            $logline .= $course->sourcedid.':';
+        } else {
+            $this->log_line($logline."sourcedid not found!");
+            return false;
+        }
+
+        if (preg_match('{<description>.*?<short>(.+?)</short>.*?</description>}is', $tagcontents, $matches)) {
+            $course->shortdescription = trim($matches[1]);
+        } else {
+            $logline .= "short description not found:";
+            $status = false;
+        }
+
+        if (preg_match('{<description>.*?<long>(.+?)</long>.*?</description>}is', $tagcontents, $matches)) {
+            $course->longdescription = trim($matches[1]);
+        } else {
+            $logline .= "long description not found:";
+            $status = false;
+        }
+
+        // Get the college id
+        if (preg_match('{<relationship relation="[0-9]?">.*?<sourcedid>.*?<id>(.+?)</id>.*?</sourcedid>.*?<label>College</label>.*?</relationship>}is', $tagcontents, $matches)) {
+            $course->collegesourcedid = trim($matches[1]);
+        } else {
+            $course->collegesourcedid = '';
+            $logline .= 'college not defined:';
+        }
+
+        $course->timemodified = time();
+
+        if ($oldcourse = $DB->get_record('enrol_lmb_coursebase', array('sourcedid' => $course->sourcedid))) {
+            $course->id = $oldcourse->id;
+
+            if ($id = $DB->update_record('enrol_lmb_coursebase', $course)) {
+                $logline .= 'updated course base:';
+            } else {
+                $logline .= 'failed to update course base:';
+                $status = false;
+            }
+        } else {
+            if ($id = $DB->insert_record('enrol_lmb_coursebase', $course, true)) {
+                $logline .= 'create course base:';
+                $course->id = $id;
+            } else {
+                $logline .= 'create to update course base:';
+                $status = false;
+            }
+        }
+
+        if ($status) {
+            if (!$this->get_config('logerrors')) {
+                $this->log_line($logline.'complete');
+            }
+        } else {
+            $this->log_line($logline.'error');
+        }
+
+        return $status;
+    }
 
     /**
      * Used to call process_membership_tag_error() without passing

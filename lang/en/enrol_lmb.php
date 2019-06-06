@@ -141,8 +141,10 @@ $string['categorytype'] = 'Course Categories';
 $string['termcat'] = 'Terms';
 $string['deptcat'] = 'Departments';
 $string['termdeptcat'] = 'Terms then Departments';
+$string['collegedeptcat'] = 'Colleges then Departments';
 $string['deptcodecat'] = 'Department Codes';
 $string['termdeptcodecat'] = 'Terms then Department Codes';
+$string['collegedeptcodecat'] = 'Colleges then Department Codes';
 $string['selectedcat'] = 'Selected:';
 $string['catselect'] = 'Selected Category';
 
@@ -280,6 +282,8 @@ $string['categorytypehelp'] = 'This allows you select what categories you would 
 <li>Terms: This setting will cause courses to be placed in categories with the name of their term/semester.
 <li>Departments: This setting will cause courses to be placed in categories with the name of their host department.
 <li>Department Codes: Uses the department short code, instead of full name.
+<li>Colleges then Departments: This setting will cause courses to be placed in categories with the name of their host department, which is contained in a parent college category.
+<li>Colleges then Department Codes: Same as Colleges then Departments, but uses the department short code instead of its full name.
 <li>Terms then Departments: This setting will cause courses to be placed in categories with the name of their host department, which is contained in a parent term named for the term/semester.
 <li>Terms then Department Codes: Same as Terms then Departments, but uses the department short code instead of its full name.
 <li>Selected: With this setting, select the existing category you would like courses to be placed in from the second drop down menu.
